@@ -76,7 +76,7 @@ def make_conv1d_cpu_scheduler(M, N):
     
     s[B].parallel(n_parallel)
     
-    s[B].vectorize(n_vector_elements, factor=avx_512_elems)
+    s[B].vectorize(n_vector_elements)
     
     s[B].unroll(k_within_block, factor=num_cores)
 
