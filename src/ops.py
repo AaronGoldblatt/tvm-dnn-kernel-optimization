@@ -51,34 +51,34 @@ def make_conv1d_cpu_scheduler(M, N):
     s = te.create_schedule(B.op)
     
     num_cores = 4
-    n_parallel, n_remaining = s[B].split(B.op.axis[0], nparts=num_cores)
+    n_parallel, n = s[B].split(B.op.axis[0], nparts=num_cores)
     
     l2_cache_tile = 2048
-    n_l2_blocks, n_l2_remaining = s[B].split(n_remaining, factor=l2_cache_tile)
-    
-    avx_512_elems = 16
-    n_vector_blocks, n_vector_elems = s[B].split(n_l2_remaining, factor=avx_512_elems)
+    n_l2_blocks, n = s[B].split(n, factor=l2_cache_tile)
     
     l1_cache_tile = 256
-    n_cache_blocks, n_within_cache = s[B].split(n_vector_blocks, factor=l1_cache_tile)
+    n_l1_blocks, n = s[B].split(n, factor=l1_cache_tile)
+    
+    avx_512_elems = 16
+    n_vector_blocks, n_vector_elements = s[B].split(n, factor=avx_512_elems)
+    
     k_cache_blocks, k_within_block = s[B].split(k, factor=32)
     
     s[B].reorder(
         n_parallel,
         n_l2_blocks,
-        n_l2_remaining,
-        n_cache_blocks,
+        n_l1_blocks,
         k_cache_blocks,
-        n_within_cache,
+        n_vector_blocks,
         k_within_block,
-        n_vector_elems
+        n_vector_elements
     )
     
     s[B].parallel(n_parallel)
     
-    s[B].vectorize(n_vector_elems, factor=avx_512_elems)
+    s[B].vectorize(n_vector_elements, factor=avx_512_elems)
     
-    s[B].unroll(k, factor=num_cores)
+    s[B].unroll(k_within_block, factor=num_cores)
 
     s[B].prefetch(A_padded, k, 2)
     s[B].prefetch(W, k, 2)
