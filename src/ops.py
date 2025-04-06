@@ -143,9 +143,7 @@ def make_conv1d_gpu_scheduler(M, N):
     )
 
     s = te.create_schedule(B.op)
-    
-    s[A_padded].compute_at(s[B], s[B].op.axis[0])
-    
+        
     A_shared = s.cache_read(A_padded, "shared", [B])
     W_shared = s.cache_read(W, "shared", [B])
     
@@ -162,6 +160,11 @@ def make_conv1d_gpu_scheduler(M, N):
     
     vector_size = 32
     n_thread, n_vector = s[B].split(n_thread, factor=vector_size)
+    
+    pad_axis = s[A_padded].op.axis[0]
+    pad_outer, pad_inner = s[A_padded].split(pad_axis, factor=256)
+    s[A_padded].bind(pad_outer, te.thread_axis("blockIdx.x"))
+    s[A_padded].bind(pad_inner, te.thread_axis("threadIdx.x"))
     
     s[B].reorder(n_block, k_cache_blocks, n_thread, k_within_block, n_vector)
     
