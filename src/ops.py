@@ -78,7 +78,7 @@ def make_conv1d_cpu_scheduler(M, N):
     
     s[B].vectorize(n_vector_elements)
     
-    s[B].unroll(k_within_block, factor=num_cores)
+    s[B].unroll(k_within_block)
 
     s[B].prefetch(A_padded, k, 2)
     s[B].prefetch(W, k, 2)
