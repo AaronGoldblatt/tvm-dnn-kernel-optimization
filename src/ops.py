@@ -175,9 +175,6 @@ def make_conv1d_gpu_scheduler(M, N):
     s[A_shared].storage_align(s[B].op.axis[0], 32, 0)
     s[W_shared].storage_align(s[B].op.axis[0], 32, 0)
     
-    s[A_shared].prefetch(A_padded, k_within_block, 1)
-    s[W_shared].prefetch(W, k_within_block, 1)
-    
     s[B].unroll(k_within_block)
     
     s[B].vectorize(n_vector)
