@@ -119,12 +119,67 @@ def make_conv1d_gpu_scheduler_baseline(M, N):
 def make_conv1d_gpu_scheduler(M, N):
     A = te.placeholder((M,), name="A")
     W = te.placeholder((N,), name="W")
+    
+    pad = N - 1
+    
+    A_padded = te.compute(
+        (M + 2 * pad,),
+        lambda i: tvm.tir.if_then_else(
+            tvm.tir.any(i < pad, i >= M + pad),
+            tvm.tir.const(0.0, "float32"),
+            A[i - pad]
+        ),
+        name="A_padded"
+    )
 
-    # TODO: fill-in start
-    B = None
-    s = None
-    # TODO: fill-in end
+    k = te.reduce_axis((0, N), "k")
+    B = te.compute(
+        (M + N - 1,),
+        lambda n: te.sum(
+            A_padded[n + pad - k] * W[k],
+            axis=k
+        ),
+        name="B",
+    )
 
+    s = te.create_schedule(B.op)
+    
+    A_shared = s.cache_read(A_padded, "shared", [B])
+    W_shared = s.cache_read(W, "shared", [B])
+    
+    A_local = s.cache_read(A_shared, "local", [B])
+    W_local = s.cache_read(W_shared, "local", [B])
+    
+    n = B.op.axis[0]
+    
+    block_size = 256
+    n_block, n_thread = s[B].split(n, factor=block_size)
+    
+    vector_size = 32
+    n_thread, n_vector = s[B].split(n_thread, factor=vector_size)
+    
+    tile_size = 32
+    k_cache_blocks, k_within_block = s[B].split(k, factor=tile_size)
+    
+    s[B].reorder(n_block, n_thread, k_cache_blocks, k_within_block, n_vector)
+    
+    s[B].bind(n_block, te.thread_axis("blockIdx.x"))
+    s[B].bind(n_thread, te.thread_axis("threadIdx.x"))
+    
+    s[A_shared].compute_at(s[B], k_cache_blocks)
+    s[W_shared].compute_at(s[B], k_cache_blocks)
+    
+    s[A_local].compute_at(s[B], k_within_block)
+    s[W_local].compute_at(s[B], k_within_block)
+    
+    s[A_shared].double_buffer()
+    s[W_shared].double_buffer()
+    
+    s[A_shared].storage_align(s[B].op.axis[0], 32, 0)
+    s[W_shared].storage_align(s[B].op.axis[0], 32, 0)
+    
+    s[B].vectorize(n_vector)
+    
     return s, A, W, B
 
 
