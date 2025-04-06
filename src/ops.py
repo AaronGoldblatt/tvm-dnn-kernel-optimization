@@ -155,13 +155,13 @@ def make_conv1d_gpu_scheduler(M, N):
     block_size = 256
     n_block, n_thread = s[B].split(n, factor=block_size)
     
-    vector_size = 32
-    n_thread, n_vector = s[B].split(n_thread, factor=vector_size)
-    
     tile_size = 32
     k_cache_blocks, k_within_block = s[B].split(k, factor=tile_size)
     
-    s[B].reorder(n_block, n_thread, k_cache_blocks, k_within_block, n_vector)
+    vector_size = 32
+    n_thread, n_vector = s[B].split(n_thread, factor=vector_size)
+    
+    s[B].reorder(n_block, k_cache_blocks, n_thread, k_within_block, n_vector)
     
     s[B].bind(n_block, te.thread_axis("blockIdx.x"))
     s[B].bind(n_thread, te.thread_axis("threadIdx.x"))
