@@ -158,7 +158,7 @@ def make_conv1d_gpu_scheduler(M, N):
     tile_size = 32
     k_cache_blocks, k_within_block = s[B].split(k, factor=tile_size)
     
-    vector_size = 8
+    vector_size = 4
     n_thread, n_vector = s[B].split(n_thread, factor=vector_size)
     
     pad_axis = s[A_padded].op.axis[0]
