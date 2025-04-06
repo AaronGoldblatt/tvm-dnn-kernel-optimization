@@ -80,8 +80,8 @@ def make_conv1d_cpu_scheduler(M, N):
     
     s[B].unroll(k_within_block)
 
-    s[B].prefetch(A_padded, k, 2)
-    s[B].prefetch(W, k, 2)
+    s[B].prefetch(A_padded, k_within_block, 2)
+    s[B].prefetch(W, k_within_block, 2)
     
     return s, A, W, B
 
