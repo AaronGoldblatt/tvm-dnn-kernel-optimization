@@ -144,6 +144,8 @@ def make_conv1d_gpu_scheduler(M, N):
 
     s = te.create_schedule(B.op)
     
+    s[A_padded].compute_at(s[B], s[B].op.axis[0])
+    
     A_shared = s.cache_read(A_padded, "shared", [B])
     W_shared = s.cache_read(W, "shared", [B])
     
