@@ -50,6 +50,9 @@ def make_conv1d_cpu_scheduler(M, N):
 
     s = te.create_schedule(B.op)
     
+    A_local = s.cache_read(A_padded, "local", [B])
+    W_local = s.cache_read(W, "local", [B])
+    
     num_cores = 4
     n_parallel, n = s[B].split(B.op.axis[0], nparts=num_cores)
     
@@ -63,6 +66,9 @@ def make_conv1d_cpu_scheduler(M, N):
     n_vector_blocks, n_vector_elements = s[B].split(n, factor=avx_512_elems)
     
     k_cache_blocks, k_within_block = s[B].split(k, factor=32)
+    
+    s[A_local].compute_at(s[B], k_cache_blocks)
+    s[W_local].compute_at(s[B], k_cache_blocks)
     
     s[B].reorder(
         n_parallel,
@@ -79,9 +85,6 @@ def make_conv1d_cpu_scheduler(M, N):
     s[B].vectorize(n_vector_elements)
     
     s[B].unroll(k_within_block)
-
-    s[B].prefetch(A_padded, k_within_block, 2)
-    s[B].prefetch(W, k_within_block, 2)
     
     return s, A, W, B
 
