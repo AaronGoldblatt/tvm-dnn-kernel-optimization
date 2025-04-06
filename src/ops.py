@@ -161,22 +161,22 @@ def make_conv1d_gpu_scheduler(M, N):
     tile_size = 32
     k_cache_blocks, k_within_block = s[B].split(k, factor=tile_size)
     
-    s[B].reorder(n_block, n_thread, k_cache_blocks, k_within_block, n_vector)
-    
     s[B].bind(n_block, te.thread_axis("blockIdx.x"))
     s[B].bind(n_thread, te.thread_axis("threadIdx.x"))
     
-    s[A_shared].compute_at(s[B], k_cache_blocks)
-    s[W_shared].compute_at(s[B], k_cache_blocks)
+    s[A_shared].compute_at(s[B], n_block)
+    s[W_shared].compute_at(s[B], n_block)
     
-    s[A_local].compute_at(s[B], k_within_block)
-    s[W_local].compute_at(s[B], k_within_block)
+    s[A_local].compute_at(s[B], k_cache_blocks)
+    s[W_local].compute_at(s[B], k_cache_blocks)
     
-    s[A_shared].double_buffer()
-    s[W_shared].double_buffer()
+    s[B].reorder(n_block, n_thread, k_cache_blocks, k_within_block, n_vector)
     
     s[A_shared].storage_align(s[B].op.axis[0], 32, 0)
     s[W_shared].storage_align(s[B].op.axis[0], 32, 0)
+    
+    s[A_shared].double_buffer()
+    s[W_shared].double_buffer()
     
     s[B].vectorize(n_vector)
     
