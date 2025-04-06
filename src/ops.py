@@ -93,10 +93,25 @@ def make_conv1d_gpu_scheduler_baseline(M, N):
     A = te.placeholder((M,), name="A")
     W = te.placeholder((N,), name="W")
 
-    # TODO: fill-in start
-    B = None
-    s = None
-    # TODO: fill-in end
+    k = te.reduce_axis((0, M + N - 1), "k")
+    B = te.compute(
+        (M + N - 1,),
+        lambda n: te.sum(tvm.tir.if_then_else(
+            tvm.tir.any(k < 0, k >= M, n - k < 0, n - k >= N),
+            tvm.tir.const(0.0, "float32"),
+            A[k] * W[n - k]), axis=k),
+        name="B",
+    )
+
+    s = te.create_schedule(B.op)
+    
+    n = B.op.axis[0]
+    
+    block_size = 256
+    n_block, n_thread = s[B].split(n, factor=block_size)
+    
+    s[B].bind(n_block, te.thread_axis("blockIdx.x"))
+    s[B].bind(n_thread, te.thread_axis("threadIdx.x"))
 
     return s, A, W, B
 
