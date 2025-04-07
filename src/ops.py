@@ -187,7 +187,7 @@ def make_conv1d_gpu_scheduler(M, N):
     return s, A, W, B
 
 
-def make_gemm_gpu_scheduler(M, K, N):
+def make_gemm_gpu_scheduler_baseline(M, K, N):
     A = te.placeholder((M, K), name="A")
     B = te.placeholder((K, N), name="B")
 
@@ -215,7 +215,7 @@ def make_gemm_gpu_scheduler(M, K, N):
     return s, A, B, C
 
 
-def make_gemm_gpu_scheduler_baseline(M, K, N):
+def make_gemm_gpu_scheduler(M, K, N):
     A = te.placeholder((M, K), name="A")
     B = te.placeholder((K, N), name="B")
 
