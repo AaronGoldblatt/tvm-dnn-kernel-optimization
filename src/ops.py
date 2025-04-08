@@ -235,44 +235,46 @@ def make_gemm_gpu_scheduler(M, K, N):
     block_size = 32
     thread_axis_x = te.thread_axis((0, block_size), "threadIdx.x")
     thread_axis_y = te.thread_axis((0, block_size), "threadIdx.y")
-    block_axis_x = te.thread_axis("blockIdx.y")
-    block_axis_y = te.thread_axis("blockIdx.x")
-
-    axis_x, axis_y = s[C].op.axis
-    block_outer_y, block_outer_x, block_inner_y, block_inner_x = s[C].tile(axis_x, axis_y, block_size, block_size)
-    s[C].bind(block_outer_y, block_axis_y)
-    s[C].bind(block_outer_x, block_axis_x)
-
-    reduction_outer, reduction_inner = s[C].split(k, factor=block_size)
-
-    s[C].reorder(
-        reduction_outer,
-        block_outer_y,
-        block_outer_x,
-        reduction_inner,
-        block_inner_y,
-        block_inner_x
-    )
-
-    s[C].bind(block_inner_y, thread_axis_y)
-    s[C].bind(block_inner_x, thread_axis_x)
+    block_axis_x = te.thread_axis("blockIdx.x")
+    block_axis_y = te.thread_axis("blockIdx.y")
 
     A_shared = s.cache_read(A, "shared", [C])
     B_shared = s.cache_read(B, "shared", [C])
+    
+    A_local = s.cache_read(A_shared, "local", [C])
+    B_local = s.cache_read(B_shared, "local", [C])
+
+    matrix_row, matrix_col = s[C].op.axis
+    block_row, thread_row = s[C].split(matrix_row, factor=block_size)
+    block_col, thread_col = s[C].split(matrix_col, factor=block_size)
+    
+    s[C].bind(block_row, block_axis_y)
+    s[C].bind(block_col, block_axis_x)
+    s[C].bind(thread_row, thread_axis_y)
+    s[C].bind(thread_col, thread_axis_x)
+
+    reduction_outer, reduction_inner = s[C].split(k, factor=8)
+
+    s[C].reorder(
+        block_row,
+        block_col,
+        reduction_outer,
+        thread_row,
+        thread_col,
+        reduction_inner
+    )
+
     s[A_shared].compute_at(s[C], reduction_outer)
     s[B_shared].compute_at(s[C], reduction_outer)
 
-    A_local = s.cache_read(A_shared, "local", [C])
-    B_local = s.cache_read(B_shared, "local", [C])
     s[A_local].compute_at(s[C], reduction_inner)
     s[B_local].compute_at(s[C], reduction_inner)
 
-    s[C].unroll(block_inner_x)
-
-    s[C].vectorize(block_inner_x)
-
     s[A_shared].storage_align(s[A_shared].op.axis[0], block_size, 0)
     s[B_shared].storage_align(s[B_shared].op.axis[0], block_size, 0)
+
+    s[C].unroll(reduction_inner)
+    s[C].vectorize(thread_col)
 
     return s, A, B, C
 
