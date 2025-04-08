@@ -253,7 +253,7 @@ def make_gemm_gpu_scheduler(M, K, N):
         block_inner_y,
         block_inner_x
     )
-    
+
     s[C].bind(block_inner_y, thread_axis_y)
     s[C].bind(block_inner_x, thread_axis_x)
 
@@ -270,9 +270,6 @@ def make_gemm_gpu_scheduler(M, K, N):
     s[C].unroll(block_inner_x)
 
     s[C].vectorize(block_inner_x)
-
-    s[A_shared].prefetch(A, reduction_outer, 1)
-    s[B_shared].prefetch(B, reduction_outer, 1)
 
     s[A_shared].storage_align(s[A_shared].op.axis[0], block_size, 0)
     s[B_shared].storage_align(s[B_shared].op.axis[0], block_size, 0)
