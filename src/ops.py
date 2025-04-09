@@ -236,6 +236,8 @@ def make_gemm_gpu_scheduler(M, K, N):
     tile_k = 8
     
     row, col = s[C].op.axis
+    
+    reduction_outer, reduction_inner = s[C].split(k, factor=tile_k)
 
     block_row, thread_row, block_col, thread_col = s[C].tile(
         row,
@@ -243,8 +245,6 @@ def make_gemm_gpu_scheduler(M, K, N):
         x_factor=block_size,
         y_factor=block_size
     )
-
-    reduction_outer, reduction_inner = s[C].split(k, factor=tile_k)
 
     s[C].reorder(
         block_row,
