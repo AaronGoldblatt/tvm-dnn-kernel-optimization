@@ -281,8 +281,8 @@ def make_gemm_gpu_scheduler(M, K, N):
 
     s[C].unroll(reduction_inner)
     
-    # s[C].parallel(block_row)
-    # s[C].parallel(block_col)
+    s[C].parallel(block_row)
+    s[C].parallel(block_col)
 
     return s, A, B, C
 
