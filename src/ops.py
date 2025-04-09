@@ -235,44 +235,47 @@ def make_gemm_gpu_scheduler(M, K, N):
     block_size = 32
     thread_size = 32
 
-    matrix_y_outer, matrix_x_outer, matrix_y_inner, matrix_x_inner = s[C].tile(
-        C.op.axis[0],
-        C.op.axis[1],
-        block_size,
-        block_size
+    row, col = s[C].op.axis
+
+    reduction_outer, reduction_inner = s[C].split(k, nparts=(K + block_size - 1) // block_size)
+
+    block_row, thread_row, block_col, thread_col = s[C].tile(
+        row,
+        col,
+        x_nparts=(M + block_size - 1) // block_size,
+        y_nparts=(N + block_size - 1) // block_size
     )
-
-    reduction_outer, reduction_inner = s[C].split(k, factor=block_size)
-
-    thread_y_block, thread_y = s[C].split(matrix_y_inner, nparts=thread_size)
-    thread_x_block, thread_x = s[C].split(matrix_x_inner, nparts=thread_size)
-
-    s[C].parallel(matrix_y_outer)
-    s[C].parallel(matrix_x_outer)
-
-    s[C].bind(matrix_y_outer, te.thread_axis("blockIdx.y"))
-    s[C].bind(matrix_x_outer, te.thread_axis("blockIdx.x"))
-    s[C].bind(thread_y_block, te.thread_axis((0, thread_size), "threadIdx.y"))
-    s[C].bind(thread_x_block, te.thread_axis((0, thread_size), "threadIdx.x"))
-
-    A_local = s.cache_read(A, "local", [C])
-    B_local = s.cache_read(B, "local", [C])
-
-    s[A_local].compute_at(s[C], reduction_outer)
-    s[B_local].compute_at(s[C], reduction_outer)
 
     s[C].reorder(
+        block_row,
+        block_col,
         reduction_outer,
-        reduction_inner,
-        matrix_x_inner,
-        matrix_y_inner,
-        thread_x_block,
-        thread_y_block
+        thread_row,
+        thread_col,
+        reduction_inner
     )
+
+    A_shared = s.cache_read(A, "shared", [C])
+    B_shared = s.cache_read(B, "shared", [C])
+    A_local = s.cache_read(A_shared, "local", [C])
+    B_local = s.cache_read(B_shared, "local", [C])
+
+    s[A_shared].compute_at(s[C], reduction_outer)
+    s[B_shared].compute_at(s[C], reduction_outer)
+    s[A_local].compute_at(s[C], reduction_inner)
+    s[B_local].compute_at(s[C], reduction_inner)
+
+    s[C].bind(block_row, te.thread_axis("blockIdx.y"))
+    s[C].bind(block_col, te.thread_axis("blockIdx.x"))
+    s[C].bind(thread_row, te.thread_axis((0, thread_size), "threadIdx.y"))
+    s[C].bind(thread_col, te.thread_axis((0, thread_size), "threadIdx.x"))
+
+    s[A_shared].storage_align(s[A_shared].op.axis[0], thread_size, 0)
+    s[B_shared].storage_align(s[B_shared].op.axis[0], thread_size, 0)
 
     s[C].unroll(reduction_inner)
 
-    s[C].vectorize(thread_x)
+    s[C].vectorize(thread_col)
 
     return s, A, B, C
 
