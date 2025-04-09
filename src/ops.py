@@ -237,14 +237,20 @@ def make_gemm_gpu_scheduler(M, K, N):
 
     row, col = s[C].op.axis
 
-    reduction_outer, reduction_inner = s[C].split(k, nparts=(K + block_size - 1) // block_size)
+    reduction_outer, reduction_inner = s[C].split(k, factor=block_size)
 
     block_row, thread_row, block_col, thread_col = s[C].tile(
         row,
         col,
-        x_factor=(M + block_size - 1) // block_size,
-        y_factor=(N + block_size - 1) // block_size
+        x_factor=block_size,
+        y_factor=block_size
     )
+
+    A_local = s.cache_read(A, "local", [C])
+    B_local = s.cache_read(B, "local", [C])
+
+    s[A_local].compute_at(s[C], reduction_outer)
+    s[B_local].compute_at(s[C], reduction_outer)
 
     s[C].reorder(
         block_row,
@@ -255,23 +261,10 @@ def make_gemm_gpu_scheduler(M, K, N):
         reduction_inner
     )
 
-    A_shared = s.cache_read(A, "shared", [C])
-    B_shared = s.cache_read(B, "shared", [C])
-    A_local = s.cache_read(A_shared, "local", [C])
-    B_local = s.cache_read(B_shared, "local", [C])
-
-    s[A_shared].compute_at(s[C], reduction_outer)
-    s[B_shared].compute_at(s[C], reduction_outer)
-    s[A_local].compute_at(s[C], reduction_inner)
-    s[B_local].compute_at(s[C], reduction_inner)
-
     s[C].bind(block_row, te.thread_axis("blockIdx.y"))
     s[C].bind(block_col, te.thread_axis("blockIdx.x"))
     s[C].bind(thread_row, te.thread_axis((0, thread_size), "threadIdx.y"))
     s[C].bind(thread_col, te.thread_axis((0, thread_size), "threadIdx.x"))
-
-    s[A_shared].storage_align(s[A_shared].op.axis[0], thread_size, 0)
-    s[B_shared].storage_align(s[B_shared].op.axis[0], thread_size, 0)
 
     s[C].unroll(reduction_inner)
 
