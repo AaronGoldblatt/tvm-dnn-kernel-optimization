@@ -155,6 +155,7 @@ def make_conv1d_gpu_scheduler(M, N):
     
     pad_axis = s[A_padded].op.axis[0]
     pad_outer, pad_inner = s[A_padded].split(pad_axis, factor=256)
+    
     s[A_padded].bind(pad_outer, te.thread_axis("blockIdx.x"))
     s[A_padded].bind(pad_inner, te.thread_axis("threadIdx.x"))
     
@@ -179,9 +180,7 @@ def make_conv1d_gpu_scheduler(M, N):
     s[W_shared].storage_align(s[B].op.axis[0], 32, 0)
     
     s[B].unroll(k_within_block)
-    
-    s[B].vectorize(n_vector)
-    
+        
     return s, A, W, B
 
 
