@@ -271,8 +271,6 @@ def make_gemm_gpu_scheduler(M, K, N):
 
     s[C].unroll(reduction_inner)
 
-    s[C].vectorize(thread_col)
-
     return s, A, B, C
 
 
