@@ -326,12 +326,6 @@ def make_dwsp_conv2d_gpu_scheduler(B, C, H, W, K):
     
     s[out].bind(height_inner, te.thread_axis("threadIdx.x"))
     s[out].bind(width_inner, te.thread_axis("threadIdx.y"))
-    
-    kernel_height_outer, kernel_height_inner = s[out].split(kernel_height, factor=4)
-    kernel_width_outer, kernel_width_inner = s[out].split(kernel_width, factor=4)
-    
-    s[out].unroll(kernel_height_inner)
-    s[out].unroll(kernel_width_inner)
 
     batch_padded, channel_padded, height_padded, width_padded = s[inp_padded].op.axis
     height_padded_outer, height_padded_inner = s[inp_padded].split(height_padded, factor=4)
