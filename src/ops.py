@@ -57,13 +57,13 @@ def make_conv1d_cpu_scheduler(M, N):
     n_parallel, n = s[B].split(B.op.axis[0], nparts=num_cores)
     
     avx_512_elems = 16
-    n_vector_blocks, n_vector_elements = s[B].split(n, factor=avx_512_elems)
+    n, n_vector_elements = s[B].split(n, factor=avx_512_elems)
     
     k_cache_blocks, k_within_block = s[B].split(k, factor=16)
     
     s[B].reorder(
         n_parallel,
-        n_vector_blocks,
+        n,
         k_cache_blocks,
         n_vector_elements,
         k_within_block
@@ -135,52 +135,33 @@ def make_conv1d_gpu_scheduler(M, N):
     )
 
     s = te.create_schedule(B.op)
-        
-    A_shared = s.cache_read(A_padded, "shared", [B])
-    W_shared = s.cache_read(W, "shared", [B])
-    
-    A_local = s.cache_read(A_shared, "local", [B])
-    W_local = s.cache_read(W_shared, "local", [B])
     
     n = B.op.axis[0]
     
-    block_size = 256
+    block_size = 64
     n_block, n_thread = s[B].split(n, factor=block_size)
     
-    tile_size = 32
-    k_cache_blocks, k_within_block = s[B].split(k, factor=tile_size)
-    
-    vector_size = 4
-    n_thread, n_vector = s[B].split(n_thread, factor=vector_size)
-    
-    pad_axis = s[A_padded].op.axis[0]
-    pad_outer, pad_inner = s[A_padded].split(pad_axis, factor=256)
-    
-    s[A_padded].bind(pad_outer, te.thread_axis("blockIdx.x"))
-    s[A_padded].bind(pad_inner, te.thread_axis("threadIdx.x"))
-    
-    s[B].reorder(
-        n_block,
-        k_cache_blocks,
-        n_thread,
-        k_within_block,
-        n_vector
-    )
+    unroll_size = 8
+    k_outer, k_unroll = s[B].split(k, factor=unroll_size)
     
     s[B].bind(n_block, te.thread_axis("blockIdx.x"))
     s[B].bind(n_thread, te.thread_axis("threadIdx.x"))
     
-    s[A_shared].compute_at(s[B], k_cache_blocks)
-    s[W_shared].compute_at(s[B], k_cache_blocks)
+    pad_axis = s[A_padded].op.axis[0]
+    pad_outer, pad_inner = s[A_padded].split(pad_axis, factor=block_size)
     
-    s[A_local].compute_at(s[B], k_within_block)
-    s[W_local].compute_at(s[B], k_within_block)
+    s[A_padded].bind(pad_outer, te.thread_axis("blockIdx.y"))
+    s[A_padded].bind(pad_inner, te.thread_axis("threadIdx.y"))
     
-    s[A_shared].storage_align(s[B].op.axis[0], 32, 0)
-    s[W_shared].storage_align(s[B].op.axis[0], 32, 0)
+    s[B].reorder(
+        n_block,
+        n_thread,
+        k_outer,
+        k_unroll
+    )
     
-    s[B].unroll(k_within_block)
-        
+    s[B].unroll(k_unroll)
+            
     return s, A, W, B
 
 
