@@ -232,8 +232,8 @@ def make_gemm_gpu_scheduler(M, K, N):
 
     s = te.create_schedule(C.op)
 
-    block_size = 32
-    thread_size = 32
+    block_size = 16
+    thread_size = 16
 
     row, col = s[C].op.axis
 
