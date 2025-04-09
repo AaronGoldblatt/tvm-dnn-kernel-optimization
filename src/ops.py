@@ -231,7 +231,7 @@ def make_gemm_gpu_scheduler(M, K, N):
     s = te.create_schedule(C.op)
 
     block_size = 32
-    thread_size = 16
+    thread_size = 32
 
     row, col = s[C].op.axis
 
@@ -243,6 +243,9 @@ def make_gemm_gpu_scheduler(M, K, N):
         x_factor=block_size,
         y_factor=block_size
     )
+    
+    s[C].bind(block_row, te.thread_axis("blockIdx.y"))
+    s[C].bind(block_col, te.thread_axis("blockIdx.x"))
 
     A_local = s.cache_read(A, "local", [C])
     B_local = s.cache_read(B, "local", [C])
@@ -251,16 +254,12 @@ def make_gemm_gpu_scheduler(M, K, N):
     s[B_local].compute_at(s[C], reduction_outer)
 
     s[C].reorder(
-        block_row,
-        block_col,
         reduction_outer,
         thread_row,
         thread_col,
         reduction_inner
     )
-
-    s[C].bind(block_row, te.thread_axis("blockIdx.y"))
-    s[C].bind(block_col, te.thread_axis("blockIdx.x"))
+   
     s[C].bind(thread_row, te.thread_axis((0, thread_size), "threadIdx.y"))
     s[C].bind(thread_col, te.thread_axis((0, thread_size), "threadIdx.x"))
 
