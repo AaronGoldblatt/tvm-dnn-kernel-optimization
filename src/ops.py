@@ -232,8 +232,8 @@ def make_gemm_gpu_scheduler(M, K, N):
 
     s = te.create_schedule(C.op)
 
-    block_size = 16
-    thread_size = 16
+    block_size = 32
+    thread_size = 32
 
     row, col = s[C].op.axis
 
@@ -246,15 +246,11 @@ def make_gemm_gpu_scheduler(M, K, N):
         y_factor=block_size
     )
 
-    A_shared = s.cache_read(A, "shared", [C])
-    B_shared = s.cache_read(B, "shared", [C])
-    A_local = s.cache_read(A_shared, "local", [C])
-    B_local = s.cache_read(B_shared, "local", [C])
+    A_local = s.cache_read(A, "local", [C])
+    B_local = s.cache_read(B, "local", [C])
 
-    s[A_shared].compute_at(s[C], reduction_outer)
-    s[B_shared].compute_at(s[C], reduction_outer)
-    s[A_local].compute_at(s[C], reduction_inner)
-    s[B_local].compute_at(s[C], reduction_inner)
+    s[A_local].compute_at(s[C], reduction_outer)
+    s[B_local].compute_at(s[C], reduction_outer)
 
     s[C].reorder(
         block_row,
@@ -270,8 +266,8 @@ def make_gemm_gpu_scheduler(M, K, N):
     s[C].bind(thread_row, te.thread_axis((0, thread_size), "threadIdx.y"))
     s[C].bind(thread_col, te.thread_axis((0, thread_size), "threadIdx.x"))
 
-    s[A_shared].storage_align(s[A_shared].op.axis[0], thread_size, 0)
-    s[B_shared].storage_align(s[B_shared].op.axis[0], thread_size, 0)
+    s[A_local].storage_align(s[A_local].op.axis[0], thread_size, 0)
+    s[B_local].storage_align(s[B_local].op.axis[0], thread_size, 0)
 
     s[C].unroll(reduction_inner)
 
