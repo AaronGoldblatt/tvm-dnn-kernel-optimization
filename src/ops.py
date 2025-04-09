@@ -55,6 +55,7 @@ def make_conv1d_cpu_scheduler(M, N):
     
     # num_cores = 4
     # n_parallel, n = s[B].split(B.op.axis[0], nparts=num_cores)
+    n = B.op.axis[0]
     
     vector_size = 16
     n, n_vector_elements = s[B].split(n, factor=vector_size)
