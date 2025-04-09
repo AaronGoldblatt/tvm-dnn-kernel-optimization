@@ -305,14 +305,16 @@ def make_dwsp_conv2d_gpu_scheduler(B, C, H, W, K):
     s = te.create_schedule(out.op)
 
     batch, channel, height, width = s[out].op.axis
-    height_outer, height_inner = s[out].split(height, factor=4)
-    width_outer, width_inner = s[out].split(width, factor=4)
+    height_outer, height_middle, height_inner = s[out].split(height, factor=4)
+    width_outer, width_middle, width_inner = s[out].split(width, factor=4)
 
     s[out].reorder(
         batch,
         channel,
         height_outer,
         width_outer,
+        height_middle,
+        width_middle,
         height_inner,
         width_inner
     )
@@ -320,18 +322,23 @@ def make_dwsp_conv2d_gpu_scheduler(B, C, H, W, K):
     s[out].bind(height_outer, te.thread_axis("blockIdx.x"))
     s[out].bind(width_outer, te.thread_axis("blockIdx.y"))
     
-    s[out].bind(height_inner, te.thread_axis("threadIdx.x"))
-    s[out].bind(width_inner, te.thread_axis("threadIdx.y"))
+    s[out].bind(height_middle, te.thread_axis("threadIdx.x"))
+    s[out].bind(width_middle, te.thread_axis("threadIdx.y"))
     
+    s[out].bind(height_inner, te.thread_axis("vthread"))
+    s[out].bind(width_inner, te.thread_axis("vthread"))
+
     batch_padded, channel_padded, height_padded, width_padded = s[inp_padded].op.axis
-    height_padded_outer, height_padded_inner = s[inp_padded].split(height_padded, factor=4)
-    width_padded_outer, width_padded_inner = s[inp_padded].split(width_padded, factor=4)
+    height_padded_outer, height_padded_middle, height_padded_inner = s[inp_padded].split(height_padded, factor=4)
+    width_padded_outer, width_padded_middle, width_padded_inner = s[inp_padded].split(width_padded, factor=4)
 
     s[inp_padded].reorder(
         batch_padded,
         channel_padded,
         height_padded_outer,
         width_padded_outer,
+        height_padded_middle,
+        width_padded_middle,
         height_padded_inner,
         width_padded_inner
     )
@@ -339,7 +346,10 @@ def make_dwsp_conv2d_gpu_scheduler(B, C, H, W, K):
     s[inp_padded].bind(height_padded_outer, te.thread_axis("blockIdx.z"))
     s[inp_padded].bind(width_padded_outer, te.thread_axis("blockIdx.y"))
     
-    s[inp_padded].bind(height_padded_inner, te.thread_axis("threadIdx.z"))
-    s[inp_padded].bind(width_padded_inner, te.thread_axis("threadIdx.y"))
+    s[inp_padded].bind(height_padded_middle, te.thread_axis("threadIdx.z"))
+    s[inp_padded].bind(width_padded_middle, te.thread_axis("threadIdx.y"))
+    
+    s[inp_padded].bind(height_padded_inner, te.thread_axis("vthread"))
+    s[inp_padded].bind(width_padded_inner, te.thread_axis("vthread"))
 
     return s, inp, ker, out
