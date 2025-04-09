@@ -242,8 +242,8 @@ def make_gemm_gpu_scheduler(M, K, N):
     block_row, thread_row, block_col, thread_col = s[C].tile(
         row,
         col,
-        x_nparts=(M + block_size - 1) // block_size,
-        y_nparts=(N + block_size - 1) // block_size
+        x_factor=(M + block_size - 1) // block_size,
+        y_factor=(N + block_size - 1) // block_size
     )
 
     s[C].reorder(
