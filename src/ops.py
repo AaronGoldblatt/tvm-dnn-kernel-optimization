@@ -54,8 +54,6 @@ def make_conv1d_cpu_scheduler(M, N):
     W_local = s.cache_read(W, "local", [B])
     
     n = B.op.axis[0]
-    # num_cores = 4
-    # n_parallel, n = s[B].split(B.op.axis[0], nparts=num_cores)
     
     vector_size = 16
     n, n_vector_elements = s[B].split(n, factor=vector_size)
@@ -64,7 +62,6 @@ def make_conv1d_cpu_scheduler(M, N):
     k_outer, k_inner = s[B].split(k, factor=unroll_size)
     
     s[B].reorder(
-        # n_parallel,
         n,
         k_outer,
         n_vector_elements,
@@ -74,8 +71,6 @@ def make_conv1d_cpu_scheduler(M, N):
     s[A_local].compute_at(s[B], k_outer)
     s[W_local].compute_at(s[B], k_outer)
     
-    # s[B].parallel(n_parallel)
-        
     s[B].vectorize(n_vector_elements)
     
     s[B].unroll(k_inner)
