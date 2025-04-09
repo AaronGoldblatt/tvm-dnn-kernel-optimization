@@ -53,22 +53,16 @@ def make_conv1d_cpu_scheduler(M, N):
     num_cores = 4
     n_parallel, n = s[B].split(B.op.axis[0], nparts=num_cores)
     
-    avx_512_elems = 16
-    n, n_vector_elements = s[B].split(n, factor=avx_512_elems)
-    
     k_outer, k_inner = s[B].split(k, factor=16)
     
     s[B].reorder(
         n_parallel,
         n,
         k_outer,
-        n_vector_elements,
         k_inner
     )
     
     s[B].parallel(n_parallel)
-    
-    s[B].vectorize(n_vector_elements)
     
     s[B].unroll(k_inner)
 
