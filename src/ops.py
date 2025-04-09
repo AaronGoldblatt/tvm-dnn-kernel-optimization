@@ -266,12 +266,12 @@ def make_dwsp_conv2d_gpu_scheduler_baseline(B, C, H, W, K):
 
     s = te.create_schedule(out.op)
 
-    thread_y = te.thread_axis("threadIdx.y")
-    thread_x = te.thread_axis("threadIdx.x")
+    block_height = te.thread_axis("blockIdx.y")
+    block_width = te.thread_axis("blockIdx.x")
 
     batch_axis, channel_axis, height_axis, width_axis = out.op.axis
-    s[out].bind(height_axis, thread_y)
-    s[out].bind(width_axis, thread_x)
+    s[out].bind(height_axis, block_height)
+    s[out].bind(width_axis, block_width)
 
     return s, inp, ker, out
 
@@ -302,11 +302,11 @@ def make_dwsp_conv2d_gpu_scheduler(B, C, H, W, K):
 
     s = te.create_schedule(out.op)
 
-    thread_y = te.thread_axis("threadIdx.y")
-    thread_x = te.thread_axis("threadIdx.x")
+    block_height = te.thread_axis("blockIdx.y")
+    block_width = te.thread_axis("blockIdx.x")
 
     batch_axis, channel_axis, height_axis, width_axis = out.op.axis
-    s[out].bind(height_axis, thread_y)
-    s[out].bind(width_axis, thread_x)
+    s[out].bind(height_axis, block_height)
+    s[out].bind(width_axis, block_width)
 
     return s, inp, ker, out
