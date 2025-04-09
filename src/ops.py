@@ -56,29 +56,21 @@ def make_conv1d_cpu_scheduler(M, N):
     num_cores = 4
     n_parallel, n = s[B].split(B.op.axis[0], nparts=num_cores)
     
-    l2_cache_tile = 2048
-    n_l2_blocks, n = s[B].split(n, factor=l2_cache_tile)
-    
-    l1_cache_tile = 256
-    n_l1_blocks, n = s[B].split(n, factor=l1_cache_tile)
-    
     avx_512_elems = 16
     n_vector_blocks, n_vector_elements = s[B].split(n, factor=avx_512_elems)
     
-    k_cache_blocks, k_within_block = s[B].split(k, factor=32)
-    
-    s[A_local].compute_at(s[B], k_cache_blocks)
-    s[W_local].compute_at(s[B], k_cache_blocks)
+    k_cache_blocks, k_within_block = s[B].split(k, factor=16)
     
     s[B].reorder(
         n_parallel,
-        n_l2_blocks,
-        n_l1_blocks,
-        k_cache_blocks,
         n_vector_blocks,
-        k_within_block,
-        n_vector_elements
+        k_cache_blocks,
+        n_vector_elements,
+        k_within_block
     )
+    
+    s[A_local].compute_at(s[B], k_cache_blocks)
+    s[W_local].compute_at(s[B], k_cache_blocks)
     
     s[B].parallel(n_parallel)
     
