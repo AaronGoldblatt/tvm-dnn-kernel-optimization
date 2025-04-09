@@ -245,10 +245,33 @@ def make_dwsp_conv2d_gpu_scheduler_baseline(B, C, H, W, K):
     inp = te.placeholder((B, C, H, W), name="A")
     ker = te.placeholder((C, 1, K, K), name="W")
 
-    # TODO: fill-in start
-    out = None
-    s = None
-    # TODO: fill-in end
+    kernel_height = te.reduce_axis((0, K), name="kernel_height")
+    kernel_width = te.reduce_axis((0, K), name="kernel_width")
+
+    out = te.compute(
+        (B, C, H, W),
+        lambda batch, channel, height, width: te.sum(
+            tvm.tir.if_then_else(
+                tvm.tir.any(
+                    height + kernel_height - (K//2) < 0, height + kernel_height - (K//2) >= H,
+                    width + kernel_width - (K//2) < 0, width + kernel_width - (K//2) >= W
+                ),
+                tvm.tir.const(0.0, "float32"),
+                inp[batch, channel, height + kernel_height - (K//2), width + kernel_width - (K//2)] * ker[channel, 0, kernel_height, kernel_width]
+            ),
+            axis=[kernel_height, kernel_width]
+        ),
+        name="output"
+    )
+
+    s = te.create_schedule(out.op)
+
+    thread_y = te.thread_axis("threadIdx.y")
+    thread_x = te.thread_axis("threadIdx.x")
+
+    batch_axis, channel_axis, height_axis, width_axis = out.op.axis
+    s[out].bind(height_axis, thread_y)
+    s[out].bind(width_axis, thread_x)
 
     return s, inp, ker, out
 
