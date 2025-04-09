@@ -230,19 +230,15 @@ def make_gemm_gpu_scheduler(M, K, N):
 
     s = te.create_schedule(C.op)
 
-    block_size = 16
+    block_size = 32
     thread_size = 32
 
     row, col = s[C].op.axis
 
     reduction_outer, reduction_inner = s[C].split(k, factor=block_size)
 
-    block_row, thread_row, block_col, thread_col = s[C].tile(
-        row,
-        col,
-        x_factor=block_size,
-        y_factor=block_size
-    )
+    block_row, thread_row = s[C].split(row, factor=block_size)
+    block_col, thread_col = s[C].split(col, factor=block_size)
 
     s[C].bind(block_row, te.thread_axis("blockIdx.y"))
     s[C].bind(block_col, te.thread_axis("blockIdx.x"))
