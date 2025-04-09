@@ -243,15 +243,6 @@ def make_gemm_gpu_scheduler(M, K, N):
         x_factor=block_size,
         y_factor=block_size
     )
-    
-    s[C].parallel(block_row)
-    s[C].parallel(thread_row)
-    
-    s[C].bind(block_row, te.thread_axis("blockIdx.y"))
-    s[C].bind(block_col, te.thread_axis("blockIdx.x"))
-    
-    thread_row_outer, thread_row_inner = s[C].split(thread_row, nparts=thread_size)
-    thread_col_outer, thread_col_inner = s[C].split(thread_col, nparts=thread_size)
 
     A_local = s.cache_read(A, "local", [C])
     B_local = s.cache_read(B, "local", [C])
@@ -260,19 +251,18 @@ def make_gemm_gpu_scheduler(M, K, N):
     s[B_local].compute_at(s[C], reduction_outer)
 
     s[C].reorder(
+        block_row,
+        block_col,
         reduction_outer,
-        reduction_inner,
-        thread_row_inner,
-        thread_col_inner,
-        thread_row_outer,
-        thread_col_outer
+        thread_row,
+        thread_col,
+        reduction_inner
     )
-    
-    s[C].parallel(thread_row_outer)
-    s[C].parallel(thread_col_outer)
 
-    s[C].bind(thread_row_outer, te.thread_axis((0, thread_size), "threadIdx.y"))
-    s[C].bind(thread_col_outer, te.thread_axis((0, thread_size), "threadIdx.x"))
+    s[C].bind(block_row, te.thread_axis("blockIdx.y"))
+    s[C].bind(block_col, te.thread_axis("blockIdx.x"))
+    s[C].bind(thread_row, te.thread_axis((0, thread_size), "threadIdx.y"))
+    s[C].bind(thread_col, te.thread_axis((0, thread_size), "threadIdx.x"))
 
     s[A_local].storage_align(s[A_local].op.axis[0], thread_size, 0)
     s[B_local].storage_align(s[B_local].op.axis[0], thread_size, 0)
