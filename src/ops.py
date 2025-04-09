@@ -63,10 +63,10 @@ def make_conv1d_cpu_scheduler(M, N):
     
     s[B].reorder(
         n_parallel,
-        k_cache_blocks,
         n_vector_blocks,
-        k_within_block,
-        n_vector_elements
+        k_cache_blocks,
+        n_vector_elements,
+        k_within_block
     )
     
     s[A_local].compute_at(s[B], k_cache_blocks)
