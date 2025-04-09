@@ -59,7 +59,8 @@ def make_conv1d_cpu_scheduler(M, N):
     vector_size = 16
     n, n_vector_elements = s[B].split(n, factor=vector_size)
     
-    k_outer, k_inner = s[B].split(k, factor=vector_size)
+    unroll_size = 8
+    k_outer, k_inner = s[B].split(k, factor=unroll_size)
     
     s[B].reorder(
         n_parallel,
