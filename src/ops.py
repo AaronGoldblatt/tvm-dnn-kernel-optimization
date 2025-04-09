@@ -59,7 +59,7 @@ def make_conv1d_cpu_scheduler(M, N):
     avx_512_elems = 16
     n_vector_blocks, n_vector_elements = s[B].split(n, factor=avx_512_elems)
     
-    k_cache_blocks, k_within_block = s[B].split(k, factor=16)
+    k_cache_blocks, k_within_block = s[B].split(k, factor=8)
     
     s[B].reorder(
         n_parallel,
