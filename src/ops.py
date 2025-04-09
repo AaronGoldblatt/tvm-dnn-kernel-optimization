@@ -263,8 +263,8 @@ def make_gemm_gpu_scheduler(M, K, N):
     A_shared = s.cache_read(A, "shared", [C])
     B_shared = s.cache_read(B, "shared", [C])
 
-    s[A_shared].compute_at(s[C], reduction_outer)
-    s[B_shared].compute_at(s[C], reduction_outer)
+    s[A_shared].compute_at(s[C], block_row)
+    s[B_shared].compute_at(s[C], block_row)
 
     s[A_shared].storage_align(A_shared.op.axis[0], block_size, 0)
     s[B_shared].storage_align(B_shared.op.axis[0], block_size, 0)
@@ -279,8 +279,8 @@ def make_gemm_gpu_scheduler(M, K, N):
 
     s[C].unroll(reduction_inner)
     
-    s[C].parallel(block_row)
-    s[C].parallel(block_col)
+    # s[C].parallel(block_row)
+    # s[C].parallel(block_col)
 
     return s, A, B, C
 
