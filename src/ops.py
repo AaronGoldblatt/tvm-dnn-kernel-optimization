@@ -244,6 +244,9 @@ def make_gemm_gpu_scheduler(M, K, N):
         y_factor=block_size
     )
     
+    s[C].parallel(block_row)
+    s[C].parallel(thread_row)
+    
     s[C].bind(block_row, te.thread_axis("blockIdx.y"))
     s[C].bind(block_col, te.thread_axis("blockIdx.x"))
     
@@ -264,6 +267,9 @@ def make_gemm_gpu_scheduler(M, K, N):
         thread_row_outer,
         thread_col_outer
     )
+    
+    s[C].parallel(thread_row_outer)
+    s[C].parallel(thread_col_outer)
 
     s[C].bind(thread_row_outer, te.thread_axis((0, thread_size), "threadIdx.y"))
     s[C].bind(thread_col_outer, te.thread_axis((0, thread_size), "threadIdx.x"))
