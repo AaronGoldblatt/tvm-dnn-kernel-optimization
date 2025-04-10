@@ -228,8 +228,8 @@ def make_gemm_gpu_scheduler(M, K, N):
     s[C].bind(thread_row, te.thread_axis((0, thread_size), "threadIdx.y"))
     s[C].bind(thread_col, te.thread_axis((0, thread_size), "threadIdx.x"))
 
-    s[A_local].storage_align(s[A_local].op.axis[0], thread_size, 0)
-    s[B_local].storage_align(s[B_local].op.axis[0], thread_size, 0)
+    # s[A_local].storage_align(s[A_local].op.axis[0], thread_size, 0)
+    # s[B_local].storage_align(s[B_local].op.axis[0], thread_size, 0)
 
     s[C].unroll(reduction_inner)
 
