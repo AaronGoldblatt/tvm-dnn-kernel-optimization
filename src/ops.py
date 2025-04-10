@@ -308,12 +308,12 @@ def make_dwsp_conv2d_gpu_scheduler(B, C, H, W, K):
 
     s = te.create_schedule(out.op)
     
-    inp_shared = s.cache_read(inp_padded, "shared", [out])
-    ker_shared = s.cache_read(ker, "shared", [out])
+    tile_height = 16
+    tile_width = 16
 
     batch, channel, height, width = s[out].op.axis
-    height_outer, height_inner = s[out].split(height, factor=4)
-    width_outer, width_inner = s[out].split(width, factor=4)
+    height_outer, height_inner = s[out].split(height, factor=tile_height)
+    width_outer, width_inner = s[out].split(width, factor=tile_width)
 
     s[out].reorder(
         batch,
@@ -330,12 +330,9 @@ def make_dwsp_conv2d_gpu_scheduler(B, C, H, W, K):
     s[out].bind(height_inner, te.thread_axis("threadIdx.x"))
     s[out].bind(width_inner, te.thread_axis("threadIdx.y"))
     
-    s[inp_shared].compute_at(s[out], height_outer)
-    s[ker_shared].compute_at(s[out], height_outer)
-    
     batch_padded, channel_padded, height_padded, width_padded = s[inp_padded].op.axis
-    height_padded_outer, height_padded_inner = s[inp_padded].split(height_padded, factor=4)
-    width_padded_outer, width_padded_inner = s[inp_padded].split(width_padded, factor=4)
+    height_padded_outer, height_padded_inner = s[inp_padded].split(height_padded, factor=tile_height)
+    width_padded_outer, width_padded_inner = s[inp_padded].split(width_padded, factor=tile_width)
 
     s[inp_padded].reorder(
         batch_padded,
