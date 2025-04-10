@@ -308,8 +308,8 @@ def make_dwsp_conv2d_gpu_scheduler(B, C, H, W, K):
 
     s = te.create_schedule(out.op)
     
-    tile_height = 16
-    tile_width = 16
+    tile_height = 8
+    tile_width = 8
 
     batch, channel, height, width = s[out].op.axis
     height_outer, height_inner = s[out].split(height, factor=tile_height)
